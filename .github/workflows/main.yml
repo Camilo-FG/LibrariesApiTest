@@ -13,10 +13,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET 6
+      - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '6.0.x'
+          dotnet-version: '8.0.x'
 
       - name: Install dependencies
         run: dotnet restore
@@ -24,11 +24,14 @@ jobs:
       - name: Build
         run: dotnet build --configuration Release --no-restore
 
-      - name: Test with .NET
+      - name: Test
         run: dotnet test --configuration Release --no-build
 
       - name: Publish
-        run: dotnet publish --configuration Release --output ./publish --runtime win-x86 --self-contained false
+        run: dotnet publish ./HackerRank1/HackerRank1.csproj --configuration Release --output "${{ github.workspace }}\publish" --runtime win-x86 --self-contained false
+
+      - name: Check publish folder
+        run: dir "${{ github.workspace }}\publish"
 
       - name: Deploy to MonsterASP.NET via WebDeploy
         uses: rasmusbuchholdt/simply-web-deploy@2.1.0
@@ -37,5 +40,5 @@ jobs:
           server-computer-name: ${{ secrets.SERVER_COMPUTER_NAME }}
           server-username: ${{ secrets.SERVER_USERNAME }}
           server-password: ${{ secrets.SERVER_PASSWORD }}
-          source-path: './publish'
+          source-path: '${{ github.workspace }}\publish'
           target-path: '/'
