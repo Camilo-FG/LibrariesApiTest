@@ -1,17 +1,15 @@
-﻿
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading.Tasks;
 using FluentAssertions;
 using LibraryService.WebAPI;
 using LibraryService.WebAPI.Data;
 using LibraryService.WebAPI.DTO;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -19,7 +17,7 @@ using Newtonsoft.Json;
 using Xunit;
 
 namespace LibraryService.Tests
-{    
+{
     public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
     {
         private readonly WebApplicationFactory<Program> _factory;
@@ -30,13 +28,15 @@ namespace LibraryService.Tests
         public IntegrationTests(WebApplicationFactory<Program> factory)
         {
             _factory = factory;
+
             context = new LibraryContext(new DbContextOptionsBuilder<LibraryContext>()
-                        .UseSqlite("DataSource=:memory:")
-                        .EnableSensitiveDataLogging()
-                        .Options);
+                .UseSqlite("DataSource=:memory:")
+                .EnableSensitiveDataLogging()
+                .Options);
+
             Client = _factory.WithWebHostBuilder(builder =>
-                builder.UseStartup<Startup>()
-                .ConfigureServices(services =>
+            {
+                builder.ConfigureServices(services =>
                 {
                     services.RemoveAll(typeof(LibraryContext));
                     services.AddSingleton(context);
@@ -51,8 +51,40 @@ namespace LibraryService.Tests
                     {
                         entity.State = EntityState.Detached;
                     }
-                })
-            ).CreateClient();
+                });
+            }).CreateClient();
+        }
+
+        private async Task AuthenticateAsync()
+        {
+            var loginData = new
+            {
+                email = "admin",
+                password = "1234"
+            };
+
+            var response = await Client.PostAsync(
+                "/login",
+                new StringContent(
+                    JsonConvert.SerializeObject(loginData),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            );
+
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync();
+
+            var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(json);
+
+            Client.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Bearer", tokenResponse!.Token);
+        }
+
+        private class TokenResponse
+        {
+            public string Token { get; set; } = string.Empty;
         }
 
         private async Task SeedLibrary()
@@ -66,7 +98,12 @@ namespace LibraryService.Tests
             };
 
             await context.Libraries.AddRangeAsync(libraries);
-            await context.SaveChangesAsync();  // Save to the database
+            await context.SaveChangesAsync();
+
+            foreach (var entity in context.ChangeTracker.Entries().ToList())
+            {
+                entity.State = EntityState.Detached;
+            }
         }
 
         private async Task SeedBook(string bookName, int libraryId)
@@ -75,8 +112,15 @@ namespace LibraryService.Tests
             {
                 Name = bookName
             };
-            var response1 = await Client.PostAsync($"/api/libraries/{libraryId}/books",
-                new StringContent(JsonConvert.SerializeObject(bookForm), Encoding.UTF8, "application/json"));
+
+            await Client.PostAsync(
+                $"/api/libraries/{libraryId}/books",
+                new StringContent(
+                    JsonConvert.SerializeObject(bookForm),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            );
         }
 
         // TEST NAME - addBookToLibrary
@@ -84,6 +128,8 @@ namespace LibraryService.Tests
         [Fact]
         public async Task TestAddBook_Ok_GetBook_NotFound()
         {
+            await AuthenticateAsync();
+
             await SeedLibrary();
 
             var bookForm = new BookForm
@@ -91,8 +137,14 @@ namespace LibraryService.Tests
                 Name = "Test book 1",
             };
 
-            var response1 = await Client.PostAsync($"/api/libraries/1/books",
-                new StringContent(JsonConvert.SerializeObject(bookForm), Encoding.UTF8, "application/json"));
+            var response1 = await Client.PostAsync(
+                "/api/libraries/1/books",
+                new StringContent(
+                    JsonConvert.SerializeObject(bookForm),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            );
 
             response1.StatusCode.Should().BeEquivalentTo(StatusCodes.Status201Created);
 
@@ -101,8 +153,14 @@ namespace LibraryService.Tests
                 Name = "Test book 2",
             };
 
-            var response2 = await Client.PostAsync($"/api/libraries/100/books",
-                new StringContent(JsonConvert.SerializeObject(bookForm), Encoding.UTF8, "application/json"));
+            var response2 = await Client.PostAsync(
+                "/api/libraries/100/books",
+                new StringContent(
+                    JsonConvert.SerializeObject(bookForm),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            );
 
             response2.StatusCode.Should().BeEquivalentTo(StatusCodes.Status404NotFound);
         }
@@ -112,22 +170,33 @@ namespace LibraryService.Tests
         [Fact]
         public async Task TestGetBooks_Ok_NotFound()
         {
+            await AuthenticateAsync();
+
             await SeedLibrary();
 
             await SeedBook("test book 1", 1);
             await SeedBook("test book 2", 1);
 
-            var response1 = await Client.GetAsync($"/api/libraries/2/books");
+            var response1 = await Client.GetAsync("/api/libraries/2/books");
+
             response1.StatusCode.Should().BeEquivalentTo(StatusCodes.Status200OK);
-            var books = JsonConvert.DeserializeObject<IEnumerable<Book>>(response1.Content.ReadAsStringAsync().Result).ToList();
+
+            var content1 = await response1.Content.ReadAsStringAsync();
+            var books = JsonConvert.DeserializeObject<IEnumerable<Book>>(content1)!.ToList();
+
             books.Count.Should().Be(0);
 
-            var response2 = await Client.GetAsync($"/api/libraries/1/books");
+            var response2 = await Client.GetAsync("/api/libraries/1/books");
+
             response2.StatusCode.Should().BeEquivalentTo(StatusCodes.Status200OK);
-            var books2 = JsonConvert.DeserializeObject<IEnumerable<Book>>(response2.Content.ReadAsStringAsync().Result).ToList();
+
+            var content2 = await response2.Content.ReadAsStringAsync();
+            var books2 = JsonConvert.DeserializeObject<IEnumerable<Book>>(content2)!.ToList();
+
             books2.Count.Should().Be(2);
 
-            var response3 = await Client.GetAsync($"/api/libraries/31232/books");
+            var response3 = await Client.GetAsync("/api/libraries/31232/books");
+
             response3.StatusCode.Should().BeEquivalentTo(StatusCodes.Status404NotFound);
         }
 
@@ -136,6 +205,8 @@ namespace LibraryService.Tests
         [Fact]
         public async Task TestDeleteLibrary()
         {
+            await AuthenticateAsync();
+
             await SeedLibrary();
 
             var bookForm = new BookForm
@@ -144,19 +215,29 @@ namespace LibraryService.Tests
             };
 
             // add book to library
-            var response0 = await Client.PostAsync("/api/libraries/1/books",
-                new StringContent(JsonConvert.SerializeObject(bookForm), Encoding.UTF8, "application/json"));
+            var response0 = await Client.PostAsync(
+                "/api/libraries/1/books",
+                new StringContent(
+                    JsonConvert.SerializeObject(bookForm),
+                    Encoding.UTF8,
+                    "application/json"
+                )
+            );
+
             response0.StatusCode.Should().BeEquivalentTo(StatusCodes.Status201Created);
 
             // delete library
             var response1 = await Client.DeleteAsync("/api/libraries/1");
+
             response1.StatusCode.Should().BeEquivalentTo(StatusCodes.Status204NoContent);
 
             // Verify that delete is successful
             var response2 = await Client.GetAsync("/api/libraries/1/books");
+
             response2.StatusCode.Should().BeEquivalentTo(StatusCodes.Status404NotFound);
 
             var response3 = await Client.DeleteAsync("/api/libraries/1");
+
             response3.StatusCode.Should().BeEquivalentTo(StatusCodes.Status404NotFound);
         }
     }
