@@ -17,26 +17,52 @@ namespace LibraryService.WebAPI.Services
 
         public async Task<IEnumerable<Book>> Get(int libraryId, int[] ids)
         {
-            // Complete the implementation
-            throw new NotImplementedException();
+            var libraryExists = await _libraryContext.Libraries.AnyAsync(l => l.Id == libraryId);
+            if (!libraryExists)
+                return Enumerable.Empty<Book>();
+
+            var query = _libraryContext.Books.Where(b => b.LibraryId == libraryId);
+
+            if (ids != null && ids.Length > 0)
+                query = query.Where(b => ids.Contains(b.Id));
+
+            return await query.ToListAsync();
         }
 
         public async Task<Book> Add(Book book)
         {
-            // Complete the implementation
-            throw new NotImplementedException();
+            var libraryExists = await _libraryContext.Libraries.AnyAsync(l => l.Id == book.LibraryId);
+            if (!libraryExists)
+                return null;
+
+            await _libraryContext.Books.AddAsync(book);
+            await _libraryContext.SaveChangesAsync();
+            return book;
         }
 
         public async Task<Book> Update(Book book)
         {
-            // Complete the implementation
-            throw new NotImplementedException();
+            var existing = await _libraryContext.Books.SingleOrDefaultAsync(b => b.Id == book.Id);
+            if (existing == null)
+                return null;
+
+            existing.Name = book.Name;
+            existing.Category = book.Category;
+            existing.LibraryId = book.LibraryId;
+
+            await _libraryContext.SaveChangesAsync();
+            return existing;
         }
 
         public async Task<bool> Delete(Book book)
         {
-            // Complete the implementation
-            throw new NotImplementedException();
+            var existing = await _libraryContext.Books.SingleOrDefaultAsync(b => b.Id == book.Id);
+            if (existing == null)
+                return false;
+
+            _libraryContext.Books.Remove(existing);
+            await _libraryContext.SaveChangesAsync();
+            return true;
         }
     }
 

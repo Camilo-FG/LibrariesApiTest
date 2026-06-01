@@ -20,7 +20,7 @@ namespace LibraryService.WebAPI.Controllers
         }
 
         [HttpGet]
-        [Authorize]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> GetAll()
         {
             var libraries = await _librariesService.Get(null);
@@ -28,6 +28,7 @@ namespace LibraryService.WebAPI.Controllers
         }
 
         [HttpGet("{libraryId}")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> Get(int libraryId)
         {
             var library = (await _librariesService.Get(new[] { libraryId })).FirstOrDefault();
@@ -37,6 +38,7 @@ namespace LibraryService.WebAPI.Controllers
         }
 
         [HttpPost]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> Add(Library l)
         {
             await _librariesService.Add(l);
@@ -44,6 +46,7 @@ namespace LibraryService.WebAPI.Controllers
         }
 
         [HttpPut("{libraryId}")]
+        [Authorize(Roles = "admin")]
         public async Task<IActionResult> Update(int libraryId, Library library)
         {
             var existingLibrary = (await _librariesService.Get(new[] { libraryId })).FirstOrDefault();

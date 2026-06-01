@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace HackerRank1.Controllers;
 
 public record TokenResponse(string token);
-
+public record UserCredential(string Email, string Password);
 [ApiController]
 public class AuthController : Controller
 {
@@ -24,7 +24,7 @@ public class AuthController : Controller
 
     [HttpPost("/login")]
     [AllowAnonymous]
-    public async Task<IActionResult> Login(User user) 
+    public async Task<IActionResult> Login(UserCredential user) 
     {
         var validuser = await authenticationService.AuthenticateAsync(user.Email, user.Password);
         if (validuser is null)

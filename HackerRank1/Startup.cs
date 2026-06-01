@@ -56,7 +56,9 @@ namespace LibraryService.WebAPI
                         ValidAudience = jwtSettings.Audience,
 
                         ValidateLifetime = true,
-                        ClockSkew = TimeSpan.Zero
+                        ClockSkew = TimeSpan.Zero,
+
+                        RoleClaimType = System.Security.Claims.ClaimTypes.Role,
                     };
                 });
 
@@ -69,8 +71,24 @@ namespace LibraryService.WebAPI
             services.AddTransient<IBooksService,  BooksService>();
 
             services.AddDbContext<LibraryContext>(options => options.UseInMemoryDatabase("librarydb"));
-            services.AddControllers();
+            services.AddControllers()
+                .AddJsonOptions(options =>
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy =
+                        System.Text.Json.JsonNamingPolicy.CamelCase;
+                });
+            var corsOrigins = Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+                ?? new[] { "http://localhost:3000", "http://localhost:5173" };
 
+            services.AddCors(options =>
+            {
+                options.AddPolicy("AppCors", policy =>
+                {
+                    policy.WithOrigins(corsOrigins)
+                          .AllowAnyHeader()
+                          .AllowAnyMethod();
+                });
+            });
             // Add Swagger generation
             services.AddSwaggerGen(c =>
             {
@@ -103,8 +121,13 @@ namespace LibraryService.WebAPI
 
 
 
-            app.UseRouting();
+            if (!env.IsDevelopment())
+            {
+                app.UseHttpsRedirection();
+            }
 
+            app.UseRouting();
+            app.UseCors("AppCors");
             // Agregar los metodos de Auth al Middleware Pipeline.
             app.UseAuthentication();
             app.UseAuthorization();
@@ -113,6 +136,8 @@ namespace LibraryService.WebAPI
             {
                 endpoints.MapControllers();
             });
+
+            LibraryDataSeeder.SeedAsync(app.ApplicationServices).GetAwaiter().GetResult();
         }
     }
 }
