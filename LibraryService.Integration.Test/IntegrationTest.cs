@@ -8,6 +8,7 @@ using FluentAssertions;
 using LibraryService.WebAPI;
 using LibraryService.WebAPI.Data;
 using LibraryService.WebAPI.DTO;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
@@ -36,6 +37,8 @@ namespace LibraryService.Tests
 
             Client = _factory.WithWebHostBuilder(builder =>
             {
+                builder.UseEnvironment("Testing");
+
                 builder.ConfigureServices(services =>
                 {
                     services.RemoveAll(typeof(LibraryContext));
@@ -222,7 +225,6 @@ namespace LibraryService.Tests
                 LibraryId = 1
             };
 
-            // add book to library
             var response0 = await Client.PostAsync(
                 "/api/libraries/1/books",
                 new StringContent(
@@ -234,12 +236,10 @@ namespace LibraryService.Tests
 
             response0.StatusCode.Should().BeEquivalentTo(StatusCodes.Status201Created);
 
-            // delete library
             var response1 = await Client.DeleteAsync("/api/libraries/1");
 
             response1.StatusCode.Should().BeEquivalentTo(StatusCodes.Status204NoContent);
 
-            // Verify that delete is successful
             var response2 = await Client.GetAsync("/api/libraries/1/books");
 
             response2.StatusCode.Should().BeEquivalentTo(StatusCodes.Status404NotFound);
