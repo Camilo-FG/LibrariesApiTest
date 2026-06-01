@@ -22,7 +22,8 @@ public class AuthController : Controller
         jwtSettings = _jwtSettings;
     }
 
-    [HttpPost("/login")]
+    [HttpPost("/api/login")]
+    [HttpPost("/login")] // compatibilidad con despliegues anteriores
     [AllowAnonymous]
     public async Task<IActionResult> Login(UserCredential user) 
     {

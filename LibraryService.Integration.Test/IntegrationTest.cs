@@ -67,7 +67,7 @@ namespace LibraryService.Tests
             };
 
             var response = await Client.PostAsync(
-                "/login",
+                "/api/login",
                 new StringContent(
                     JsonConvert.SerializeObject(loginData),
                     Encoding.UTF8,
