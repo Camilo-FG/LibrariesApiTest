@@ -42,11 +42,11 @@ namespace LibraryService.Tests
                     services.AddSingleton(context);
 
                     context.Database.OpenConnection();
+                    context.Database.EnsureDeleted();
                     context.Database.EnsureCreated();
 
                     context.SaveChanges();
 
-                    // Clear local context cache
                     foreach (var entity in context.ChangeTracker.Entries().ToList())
                     {
                         entity.State = EntityState.Detached;
@@ -110,7 +110,9 @@ namespace LibraryService.Tests
         {
             var bookForm = new BookForm
             {
-                Name = bookName
+                Name = bookName,
+                Category = "Test Category",
+                LibraryId = libraryId
             };
 
             await Client.PostAsync(
@@ -135,6 +137,8 @@ namespace LibraryService.Tests
             var bookForm = new BookForm
             {
                 Name = "Test book 1",
+                Category = "Test Category",
+                LibraryId = 1
             };
 
             var response1 = await Client.PostAsync(
@@ -151,6 +155,8 @@ namespace LibraryService.Tests
             bookForm = new BookForm
             {
                 Name = "Test book 2",
+                Category = "Test Category",
+                LibraryId = 100
             };
 
             var response2 = await Client.PostAsync(
@@ -212,6 +218,8 @@ namespace LibraryService.Tests
             var bookForm = new BookForm
             {
                 Name = "test book 1",
+                Category = "Test Category",
+                LibraryId = 1
             };
 
             // add book to library
